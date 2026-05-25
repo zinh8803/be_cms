@@ -12,12 +12,17 @@ $config = [
         $response = Yii::$app->response;
         
         $origin = $request->headers->get('Origin');
-        if ($origin === 'http://localhost:5173') {
-            $response->headers->set('Access-Control-Allow-Origin', $origin);
-            $response->headers->set('Access-Control-Allow-Credentials', 'true');
-            $response->headers->set('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Requested-With');
-            $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-            $response->headers->set('Access-Control-Max-Age', '3600');
+        if ($origin) {
+            $frontendUrls = $_ENV['FRONTEND_URL'] ?? getenv('FRONTEND_URL') ?: 'http://localhost:5173';
+            $origins = array_map('trim', explode(',', $frontendUrls));
+            
+            if (in_array($origin, $origins)) {
+                $response->headers->set('Access-Control-Allow-Origin', $origin);
+                $response->headers->set('Access-Control-Allow-Credentials', 'true');
+                $response->headers->set('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Requested-With');
+                $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+                $response->headers->set('Access-Control-Max-Age', '3600');
+            }
         }
         
         if ($request->isOptions) {
