@@ -23,11 +23,14 @@ class ApiController extends Controller
     {
         $behaviors = parent::behaviors();
 
-        // 1. Configure CORS
+        // 1. Configure CORS dynamically from environment variables
+        $frontendUrls = $_ENV['FRONTEND_URL'] ?? getenv('FRONTEND_URL') ?: 'http://localhost:5173';
+        $origins = array_map('trim', explode(',', $frontendUrls));
+
         $behaviors['corsFilter'] = [
             'class' => Cors::class,
             'cors' => [
-                'Origin' => ['http://localhost:5173'], // Vite VueJS frontend
+                'Origin' => $origins,
                 'Access-Control-Request-Method' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
                 'Access-Control-Request-Headers' => ['*'],
                 'Access-Control-Allow-Credentials' => true,
