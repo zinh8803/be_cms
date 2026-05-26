@@ -25,6 +25,7 @@ jobs:
 
             composer install --optimize-autoloader
 
+            php yii migrate --migrationPath=@yii/rbac/migrations --interactive=0
             php yii migrate --interactive=0
 
             php yii cache/flush-all
@@ -32,6 +33,8 @@ jobs:
             chmod -R 775 runtime web/assets web/uploads
 
             sudo chown -R www-data:www-data runtime web/assets web/uploads
+
+            sudo systemctl restart yii2-queue
 
             sudo systemctl reload php8.2-fpm
             sudo systemctl reload nginx

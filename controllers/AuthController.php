@@ -26,10 +26,10 @@ class AuthController extends ApiController
     {
         $behaviors = parent::behaviors();
 
-        // 1. Setup bearer authenticator for me action
+        // 1. Setup bearer authenticator for me and change-password actions
         $behaviors['authenticator'] = [
             'class' => HttpBearerAuth::class,
-            'only' => ['me'],
+            'only' => ['me', 'change-password'],
         ];
 
         return $behaviors;
@@ -77,5 +77,26 @@ class AuthController extends ApiController
         }
 
         return $this->errorResponse(422, 'Đăng ký tài khoản không thành công.', $form->getErrors());
+    }
+
+    /**
+     * POST /api/auth/change-password
+     */
+    public function actionChangePassword()
+    {
+        $user = Yii::$app->user->identity;
+        if (!$user) {
+            return $this->errorResponse(401, 'Bạn chưa đăng nhập.');
+        }
+
+        $body = Yii::$app->request->getBodyParams();
+        $form = new \app\models\ChangePasswordForm($user);
+        $form->attributes = $body;
+
+        if ($form->change()) {
+            return $this->successResponse(null, 'Đổi mật khẩu thành công.');
+        }
+
+        return $this->errorResponse(422, 'Đổi mật khẩu không thành công.', $form->getErrors());
     }
 }
