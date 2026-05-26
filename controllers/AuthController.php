@@ -99,4 +99,49 @@ class AuthController extends ApiController
 
         return $this->errorResponse(422, 'Đổi mật khẩu không thành công.', $form->getErrors());
     }
+
+    /**
+     * POST /api/auth/refresh-token
+     */
+    public function actionRefreshToken()
+    {
+        $body = Yii::$app->request->getBodyParams();
+        $refreshTokenVal = $body['refresh_token'] ?? null;
+
+        if (!$refreshTokenVal) {
+            return $this->errorResponse(400, 'Refresh token không được để trống.');
+        }
+
+        $result = $this->_authService->refreshAccessToken($refreshTokenVal);
+        if ($result) {
+            return $this->successResponse($result, 'Làm mới token thành công.');
+        }
+
+        return $this->errorResponse(401, 'Refresh token không hợp lệ hoặc đã hết hạn.');
+    }
+
+    /**
+     * POST /api/auth/logout
+     */
+    public function actionLogout()
+    {
+        $body = Yii::$app->request->getBodyParams();
+        $refreshTokenVal = $body['refresh_token'] ?? null;
+        if ($refreshTokenVal) {
+            \app\models\RefreshToken::deleteAll(['token' => $refreshTokenVal]);
+        }
+
+        // Optional: clear access token if still valid / matching
+        $authHeader = Yii::$app->request->getHeaders()->get('Authorization');
+        if ($authHeader && preg_match('/^Bearer\s+(.*?)$/', $authHeader, $matches)) {
+            $accessToken = $matches[1];
+            $user = \app\models\User::findOne(['access_token' => $accessToken]);
+            if ($user) {
+                $user->access_token = null;
+                $user->save(false);
+            }
+        }
+
+        return $this->successResponse(null, 'Đăng xuất thành công.');
+    }
 }

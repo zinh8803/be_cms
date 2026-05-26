@@ -73,6 +73,18 @@ class User extends ActiveRecord implements IdentityInterface
      */
     public static function findIdentityByAccessToken($token, $type = null)
     {
+        $parts = explode('_', $token);
+        if (count($parts) >= 2) {
+            $timestamp = (int) end($parts);
+            // Dynamic tokens generated via generateAccessToken() contain a 10-digit timestamp.
+            // Seed/legacy tokens (like "admin_token_123") have small numbers and won't be checked for expiration.
+            if ($timestamp > 1000000000) {
+                $expire = Yii::$app->params['user.accessTokenExpire'] ?? 900;
+                if ($timestamp + $expire < time()) {
+                    return null; // Token expired
+                }
+            }
+        }
         return static::findOne(['access_token' => $token, 'status' => self::STATUS_ACTIVE]);
     }
 
