@@ -73,6 +73,20 @@ class User extends ActiveRecord implements IdentityInterface
      */
     public static function findIdentityByAccessToken($token, $type = null)
     {
+        // Check if it's a JWT (JWTs have 3 parts separated by dots)
+        if (substr_count($token, '.') === 2) {
+            try {
+                $secret = $_ENV['JWT_SECRET'] ?? getenv('JWT_SECRET') ?: Yii::$app->params['jwt.secret'] ?? Yii::$app->request->cookieValidationKey;
+                $decoded = \Firebase\JWT\JWT::decode($token, new \Firebase\JWT\Key($secret, 'HS256'));
+                
+                // Return active user
+                return static::findOne(['id' => $decoded->sub, 'status' => self::STATUS_ACTIVE]);
+            } catch (\Exception $e) {
+                return null; // Invalid token or expired
+            }
+        }
+
+        // Fallback for legacy or seed tokens (non-JWT)
         $parts = explode('_', $token);
         if (count($parts) >= 2) {
             $timestamp = (int) end($parts);
@@ -168,7 +182,18 @@ class User extends ActiveRecord implements IdentityInterface
      */
     public function generateAccessToken()
     {
-        $this->access_token = Yii::$app->security->generateRandomString() . '_' . time();
+        $secret = $_ENV['JWT_SECRET'] ?? getenv('JWT_SECRET') ?: Yii::$app->params['jwt.secret'] ?? Yii::$app->request->cookieValidationKey;
+        $expire = Yii::$app->params['user.accessTokenExpire'] ?? 900;
+        
+        $payload = [
+            'sub' => $this->id,
+            'username' => $this->username,
+            'email' => $this->email,
+            'iat' => time(),
+            'exp' => time() + $expire,
+        ];
+        
+        $this->access_token = \Firebase\JWT\JWT::encode($payload, $secret, 'HS256');
     }
 }
 
