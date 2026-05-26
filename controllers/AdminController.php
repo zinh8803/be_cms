@@ -301,6 +301,7 @@ class AdminController extends ApiController
 
         if ($category->validate()) {
             if ($category->save()) {
+                Yii::$app->cache->delete('public_categories_list');
                 $this->_auditLogService->log($user->id, 'TẠO_DANH_MỤC', ['category_id' => $category->id, 'name' => $category->name]);
                 return $this->successResponse($category, 'Tạo danh mục mới thành công.');
             }
@@ -332,6 +333,7 @@ class AdminController extends ApiController
 
         if ($category->validate()) {
             if ($category->save()) {
+                Yii::$app->cache->delete('public_categories_list');
                 $this->_auditLogService->log($user->id, 'CẬP_NHẬT_DANH_MỤC', ['category_id' => $category->id, 'name' => $category->name]);
                 return $this->successResponse($category, 'Cập nhật danh mục thành công.');
             }
@@ -362,6 +364,7 @@ class AdminController extends ApiController
         }
 
         if ($category->delete()) {
+            Yii::$app->cache->delete('public_categories_list');
             $this->_auditLogService->log($user->id, 'XÓA_DANH_MỤC', ['category_id' => $category->id, 'name' => $category->name]);
             return $this->successResponse(null, 'Xóa danh mục thành công.');
         }
@@ -421,6 +424,7 @@ class AdminController extends ApiController
 
         if ($tag->validate()) {
             if ($tag->save()) {
+                Yii::$app->cache->delete('public_tags_list');
                 $this->_auditLogService->log($user->id, 'TẠO_THẺ', ['tag_id' => $tag->id, 'name' => $tag->name]);
                 return $this->successResponse($tag, 'Tạo thẻ mới thành công.');
             }
@@ -451,6 +455,7 @@ class AdminController extends ApiController
 
         if ($tag->validate()) {
             if ($tag->save()) {
+                Yii::$app->cache->delete('public_tags_list');
                 $this->_auditLogService->log($user->id, 'CẬP_NHẬT_THẺ', ['tag_id' => $tag->id, 'name' => $tag->name]);
                 return $this->successResponse($tag, 'Cập nhật thẻ thành công.');
             }
@@ -481,6 +486,7 @@ class AdminController extends ApiController
             ->execute();
 
         if ($tag->delete()) {
+            Yii::$app->cache->delete('public_tags_list');
             $this->_auditLogService->log($user->id, 'XÓA_THẺ', ['tag_id' => $tag->id, 'name' => $tag->name]);
             return $this->successResponse(null, 'Xóa thẻ thành công.');
         }

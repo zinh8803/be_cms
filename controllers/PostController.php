@@ -128,4 +128,51 @@ class PostController extends ApiController
 
         return $this->successResponse($postData);
     }
+
+    /**
+     * GET /api/categories
+     * Lists all public categories.
+     */
+    public function actionCategories()
+    {
+        $cacheKey = 'public_categories_list';
+        $data = Yii::$app->cache->get($cacheKey);
+        
+        if ($data === false) {
+            $categories = \app\models\Category::find()->orderBy(['name' => SORT_ASC])->all();
+            $data = [];
+            foreach ($categories as $category) {
+                $data[] = [
+                    'id' => $category->id,
+                    'name' => $category->name,
+                    'slug' => $category->slug,
+                    'description' => $category->description,
+                ];
+            }
+            Yii::$app->cache->set($cacheKey, $data, 3600);
+        }
+        
+        return $this->successResponse($data);
+    }
+
+    /**
+     * GET /api/tags
+     * Lists all public tags.
+     */
+    public function actionTags()
+    {
+        $cacheKey = 'public_tags_list';
+        $data = Yii::$app->cache->get($cacheKey);
+        
+        if ($data === false) {
+            $tags = \app\models\Tag::find()->orderBy(['name' => SORT_ASC])->all();
+            $data = [];
+            foreach ($tags as $tag) {
+                $data[] = $tag->name;
+            }
+            Yii::$app->cache->set($cacheKey, $data, 3600);
+        }
+        
+        return $this->successResponse($data);
+    }
 }
