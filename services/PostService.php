@@ -109,9 +109,27 @@ class PostService
                 $post->published_at = null;
             }
             
+            $oldSlug = $post->getOldAttribute('slug');
+            $newSlug = PostForm::slugify($form->title);
+            
             $post->status = $form->status;
             $post->visibility = $form->visibility;
-            $post->slug = PostForm::slugify($form->title);
+            $post->slug = $newSlug;
+
+            if ($oldSlug && $oldSlug !== $newSlug) {
+                // Insert old slug to history if not exists
+                $exists = (new \yii\db\Query())
+                    ->from('{{%post_slug_history}}')
+                    ->where(['post_id' => $post->id, 'old_slug' => $oldSlug])
+                    ->exists();
+                if (!$exists) {
+                    Yii::$app->db->createCommand()->insert('{{%post_slug_history}}', [
+                        'post_id' => $post->id,
+                        'old_slug' => $oldSlug,
+                        'created_at' => time(),
+                    ])->execute();
+                }
+            }
 
             if (!$post->save()) {
                 $form->addErrors($post->getErrors());

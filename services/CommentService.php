@@ -31,6 +31,14 @@ class CommentService
         $comment->status = Comment::STATUS_APPROVED;
 
         if ($comment->save()) {
+            // Create a notification for the new comment
+            $notification = new \app\models\Notification();
+            $notification->type = 'comment';
+            $postTitle = $comment->post ? $comment->post->title : 'N/A';
+            $notification->content = "Bài viết '{$postTitle}' vừa nhận được bình luận mới từ '{$comment->author_name}'.";
+            if (!$notification->save()) {
+                Yii::error("Không thể tạo thông báo bình luận: " . json_encode($notification->getErrors()));
+            }
             return $comment;
         }
 

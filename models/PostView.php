@@ -11,6 +11,8 @@ use yii\db\ActiveRecord;
  * @property int $post_id
  * @property string|null $ip_address
  * @property string|null $user_agent
+ * @property string|null $referrer
+ * @property int $is_spam
  * @property int $viewed_at
  */
 class PostView extends ActiveRecord
@@ -22,7 +24,7 @@ class PostView extends ActiveRecord
     {
         return '{{%post_views}}';
     }
-
+ 
     /**
      * {@inheritdoc}
      */
@@ -40,7 +42,7 @@ class PostView extends ActiveRecord
             ],
         ];
     }
-
+ 
     /**
      * {@inheritdoc}
      */
@@ -48,9 +50,9 @@ class PostView extends ActiveRecord
     {
         return [
             [['post_id'], 'required'],
-            [['post_id'], 'integer'],
+            [['post_id', 'is_spam'], 'integer'],
             [['ip_address'], 'string', 'max' => 45],
-            [['user_agent'], 'string'],
+            [['user_agent', 'referrer'], 'string'],
         ];
     }
 

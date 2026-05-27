@@ -12,6 +12,7 @@ use app\models\Tag;
 use app\models\Comment;
 use app\models\AdminLog;
 use app\models\File;
+use app\models\PostView;
 use app\repositories\PostRepository;
 use app\services\PostService;
 use app\services\CommentService;
@@ -561,12 +562,30 @@ class AdminController extends ApiController
             return $this->errorResponse(403, 'Chỉ quản trị viên mới được xem nhật ký hệ thống.');
         }
 
-        $logs = AdminLog::find()
-            ->with(['user'])
-            ->orderBy(['created_at' => SORT_DESC])
-            ->limit(100)
-            ->all();
+        $params = Yii::$app->request->queryParams;
+        $query = AdminLog::find()->joinWith('user')->with('user');
 
+        if (!empty($params['username'])) {
+            $query->andWhere(['like', '{{%user}}.username', trim($params['username'])]);
+        }
+        if (!empty($params['action'])) {
+            $query->andWhere(['like', '{{%admin_logs}}.action', trim($params['action'])]);
+        }
+
+        $dataProvider = new \yii\data\ActiveDataProvider([
+            'query' => $query,
+            'pagination' => [
+                'pageSize' => isset($params['pageSize']) ? (int)$params['pageSize'] : 20,
+            ],
+            'sort' => [
+                'defaultOrder' => [
+                    'created_at' => SORT_DESC,
+                    'id' => SORT_DESC,
+                ],
+            ],
+        ]);
+
+        $models = $dataProvider->getModels();
         $data = array_map(function($l) {
             return [
                 'id' => $l->id,
@@ -575,9 +594,17 @@ class AdminController extends ApiController
                 'details' => $l->details,
                 'created_at' => $l->created_at,
             ];
-        }, $logs);
+        }, $models);
 
-        return $this->successResponse($data);
+        return $this->successResponse([
+            'logs' => $data,
+            'pagination' => [
+                'totalCount' => (int)$dataProvider->totalCount,
+                'pageSize' => (int)$dataProvider->pagination->pageSize,
+                'currentPage' => (int)($dataProvider->pagination->page + 1),
+                'pageCount' => (int)$dataProvider->pagination->pageCount,
+            ]
+        ]);
     }
 
     /**
@@ -603,5 +630,152 @@ class AdminController extends ApiController
         }, $files);
 
         return $this->successResponse($data);
+    }
+
+    /**
+     * GET /api/admin/post-views
+     * Returns log of post views (admin only).
+     */
+    public function actionPostViewsIndex()
+    {
+        if (!$this->verifyStaffRole($role) || $role !== 'admin') {
+            return $this->errorResponse(403, 'Chỉ quản trị viên mới được xem nhật ký lượt xem.');
+        }
+
+        $params = Yii::$app->request->queryParams;
+        $query = PostView::find()->joinWith('post')->with('post');
+
+        if (isset($params['post_id']) && $params['post_id'] !== '') {
+            $query->andWhere(['{{%post_views}}.post_id' => (int)$params['post_id']]);
+        }
+        if (!empty($params['post_title'])) {
+            $query->andWhere(['like', '{{%posts}}.title', trim($params['post_title'])]);
+        }
+        if (isset($params['is_spam']) && $params['is_spam'] !== '') {
+            $query->andWhere(['{{%post_views}}.is_spam' => (int)$params['is_spam']]);
+        }
+        if (!empty($params['ip_address'])) {
+            $query->andWhere(['like', '{{%post_views}}.ip_address', trim($params['ip_address'])]);
+        }
+
+        // Calculate dynamic summary metrics based on current filters
+        $totalQuery = clone $query;
+        $totalHits = (int)$totalQuery->count();
+        
+        $spamQuery = clone $query;
+        $spamHits = (int)$spamQuery->andWhere(['{{%post_views}}.is_spam' => 1])->count();
+        
+        $validHits = $totalHits - $spamHits;
+
+        $dataProvider = new \yii\data\ActiveDataProvider([
+            'query' => $query,
+            'pagination' => [
+                'pageSize' => isset($params['pageSize']) ? (int)$params['pageSize'] : 20,
+            ],
+            'sort' => [
+                'defaultOrder' => [
+                    'viewed_at' => SORT_DESC,
+                    'id' => SORT_DESC,
+                ],
+            ],
+        ]);
+
+        $models = $dataProvider->getModels();
+        $data = array_map(function($v) {
+            return [
+                'id' => $v->id,
+                'post_title' => $v->post ? $v->post->title : 'N/A',
+                'ip_address' => $v->ip_address,
+                'user_agent' => $v->user_agent,
+                'referrer' => $v->referrer,
+                'is_spam' => (int)$v->is_spam,
+                'viewed_at' => $v->viewed_at,
+            ];
+        }, $models);
+
+        return $this->successResponse([
+            'views' => $data,
+            'metrics' => [
+                'total' => $totalHits,
+                'valid' => $validHits,
+                'spam' => $spamHits,
+            ],
+            'pagination' => [
+                'totalCount' => (int)$dataProvider->totalCount,
+                'pageSize' => (int)$dataProvider->pagination->pageSize,
+                'currentPage' => (int)($dataProvider->pagination->page + 1),
+                'pageCount' => (int)$dataProvider->pagination->pageCount,
+            ]
+        ]);
+    }
+
+    /**
+     * GET /api/admin/notifications
+     * Returns list of admin notifications (admin or editor).
+     */
+    public function actionNotificationIndex()
+    {
+        if (!$this->verifyStaffRole($role)) {
+            return $this->errorResponse(403, 'Bạn không có quyền.');
+        }
+
+        $notifications = \app\models\Notification::find()
+            ->orderBy(['created_at' => SORT_DESC])
+            ->limit(100)
+            ->all();
+
+        $unreadCount = (int)\app\models\Notification::find()->where(['is_read' => 0])->count();
+
+        $data = array_map(function($n) {
+            return [
+                'id' => $n->id,
+                'type' => $n->type,
+                'content' => $n->content,
+                'is_read' => (int)$n->is_read,
+                'created_at' => $n->created_at,
+            ];
+        }, $notifications);
+
+        return $this->successResponse([
+            'notifications' => $data,
+            'unreadCount' => $unreadCount,
+        ]);
+    }
+
+    /**
+     * PUT /api/admin/notifications/<id>/read
+     * Marks a notification as read.
+     */
+    public function actionNotificationRead($id)
+    {
+        if (!$this->verifyStaffRole($role)) {
+            return $this->errorResponse(403, 'Bạn không có quyền.');
+        }
+
+        $notification = \app\models\Notification::findOne((int)$id);
+        if (!$notification) {
+            return $this->errorResponse(404, 'Không tìm thấy thông báo.');
+        }
+
+        $notification->is_read = 1;
+        if ($notification->save(false)) {
+            return $this->successResponse(null, 'Đã đánh dấu đã đọc.');
+        }
+
+        return $this->errorResponse(500, 'Không thể cập nhật trạng thái thông báo.');
+    }
+
+    /**
+     * PUT /api/admin/notifications/read-all
+     * Marks all notifications as read.
+     */
+    public function actionNotificationReadAll()
+    {
+        if (!$this->verifyStaffRole($role)) {
+            return $this->errorResponse(403, 'Bạn không có quyền.');
+        }
+
+        \app\models\Notification::updateAll(['is_read' => 1], ['is_read' => 0]);
+        return $this->successResponse(null, 'Đã đánh dấu đọc tất cả thông báo.');
     }
 }

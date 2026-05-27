@@ -3,6 +3,7 @@
 namespace app\controllers;
 
 use Yii;
+use app\models\Post;
 use app\models\PostSearch;
 use app\repositories\PostRepository;
 use app\jobs\ViewLogJob;
@@ -77,53 +78,90 @@ class PostController extends ApiController
      */
     public function actionView($slug)
     {
-        $cacheKey = 'post_detail_' . $slug;
-        $postData = Yii::$app->cache->get($cacheKey);
+        $post = $this->_postRepository->findPublicActiveBySlug($slug);
+        if (!$post) {
+            // Check slug history!
+            $history = (new \yii\db\Query())
+                ->select(['post_id'])
+                ->from('{{%post_slug_history}}')
+                ->where(['old_slug' => $slug])
+                ->one();
 
-        if ($postData === false) {
-            $post = $this->_postRepository->findPublicActiveBySlug($slug);
-            if (!$post) {
-                return $this->errorResponse(404, 'Bài viết không tồn tại hoặc đã được gỡ xuống.');
+            if ($history) {
+                $realPost = Post::find()
+                    ->publicActive()
+                    ->andWhere(['{{%posts}}.id' => $history['post_id']])
+                    ->one();
+
+                if ($realPost) {
+                    return $this->successResponse([
+                        'redirect' => true,
+                        'new_slug' => $realPost->slug,
+                    ], 'Bài viết đã được chuyển hướng.');
+                }
             }
 
-            $postData = [
-                'id' => $post->id,
-                'title' => $post->title,
-                'title_en' => $post->title_en,
-                'slug' => $post->slug,
-                'content' => $post->content,
-                'content_en' => $post->content_en,
-                'category' => $post->category ? [
-                    'id' => $post->category->id,
-                    'name' => $post->category->name,
-                    'slug' => $post->category->slug
-                ] : null,
-                'tags' => array_map(function($tag) {
-                    return ['name' => $tag->name, 'slug' => $tag->slug];
-                }, $post->tags),
-                'thumbnail_url' => $post->thumbnail ? $post->thumbnail->filepath : null,
-                'view_count' => (int)$post->view_count,
-                'published_at' => $post->published_at,
-                'seo' => $post->postSeo ? [
-                    'title' => $post->postSeo->title,
-                    'description' => $post->postSeo->description,
-                    'keywords' => $post->postSeo->keywords,
-                ] : [
-                    'title' => $post->title,
-                    'description' => mb_strimwidth(strip_tags($post->content), 0, 160, '...'),
-                    'keywords' => '',
-                ],
-            ];
-
-            // Cache in Redis for 10 minutes
-            Yii::$app->cache->set($cacheKey, $postData, 600);
+            return $this->errorResponse(404, 'Bài viết không tồn tại hoặc đã được gỡ xuống.');
         }
+
+        // Fetch related posts (same category, active, limit 3)
+        $related = [];
+        if ($post->category_id) {
+            $relatedModels = Post::find()
+                ->publicActive()
+                ->andWhere(['category_id' => $post->category_id])
+                ->andWhere(['not', ['{{%posts}}.id' => $post->id]])
+                ->orderBy(['published_at' => SORT_DESC])
+                ->limit(3)
+                ->all();
+            foreach ($relatedModels as $r) {
+                $related[] = [
+                    'title' => $r->title,
+                    'title_en' => $r->title_en,
+                    'slug' => $r->slug,
+                    'thumbnail_url' => $r->thumbnail ? $r->thumbnail->filepath : null,
+                    'published_at' => $r->published_at,
+                ];
+            }
+        }
+
+        $postData = [
+            'id' => $post->id,
+            'title' => $post->title,
+            'title_en' => $post->title_en,
+            'slug' => $post->slug,
+            'content' => $post->content,
+            'content_en' => $post->content_en,
+            'category' => $post->category ? [
+                'id' => $post->category->id,
+                'name' => $post->category->name,
+                'slug' => $post->category->slug
+            ] : null,
+            'tags' => array_map(function($tag) {
+                return ['name' => $tag->name, 'slug' => $tag->slug];
+            }, $post->tags),
+            'thumbnail_url' => $post->thumbnail ? $post->thumbnail->filepath : null,
+            'view_count' => (int)$post->view_count,
+            'published_at' => $post->published_at,
+            'updated_at' => $post->updated_at,
+            'related' => $related,
+            'seo' => $post->postSeo ? [
+                'title' => $post->postSeo->title,
+                'description' => $post->postSeo->description,
+                'keywords' => $post->postSeo->keywords,
+            ] : [
+                'title' => $post->title,
+                'description' => mb_strimwidth(strip_tags($post->content), 0, 160, '...'),
+                'keywords' => '',
+            ],
+        ];
 
         // Push logging of view to background queue
         Yii::$app->queue->push(new ViewLogJob([
             'postId' => $postData['id'],
             'ipAddress' => Yii::$app->request->userIP,
             'userAgent' => Yii::$app->request->userAgent,
+            'referrer' => Yii::$app->request->getReferrer(),
         ]));
 
         return $this->successResponse($postData);
@@ -174,5 +212,40 @@ class PostController extends ApiController
         }
         
         return $this->successResponse($data);
+    }
+
+    /**
+     * GET /api/posts/suggestions
+     * Returns matching suggestions for search queries.
+     */
+    public function actionSuggestions()
+    {
+        $q = Yii::$app->request->getQueryParam('q');
+        if (empty($q) || mb_strlen($q) < 2) {
+            return $this->successResponse([]);
+        }
+
+        // Search active public posts matching the query
+        $posts = Post::find()
+            ->publicActive()
+            ->andWhere(['or', 
+                ['like', '{{%posts}}.title', $q],
+                ['like', '{{%posts}}.title_en', $q]
+            ])
+            ->orderBy(['published_at' => SORT_DESC])
+            ->limit(8)
+            ->all();
+
+        $suggestions = [];
+        foreach ($posts as $post) {
+            $suggestions[] = [
+                'id' => $post->id,
+                'title' => $post->title,
+                'title_en' => $post->title_en,
+                'slug' => $post->slug,
+            ];
+        }
+
+        return $this->successResponse($suggestions);
     }
 }
