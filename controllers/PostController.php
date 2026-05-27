@@ -69,7 +69,19 @@ class PostController extends ApiController
             Yii::$app->cache->set($cacheKey, $data, 600);
         }
 
+        $this->setCacheHeaders(60);
         return $this->successResponse($data);
+    }
+
+    /**
+     * Set public cache headers for GET responses.
+     * Tells browser + CDN to cache for $seconds seconds.
+     */
+    private function setCacheHeaders(int $seconds = 60)
+    {
+        $response = Yii::$app->response;
+        $response->headers->set('Cache-Control', "public, max-age={$seconds}, stale-while-revalidate=30");
+        $response->headers->set('Vary', 'Accept-Encoding');
     }
 
     /**
@@ -158,12 +170,14 @@ class PostController extends ApiController
 
         // Push logging of view to background queue
         Yii::$app->queue->push(new ViewLogJob([
-            'postId' => $postData['id'],
+            'postId'    => $postData['id'],
             'ipAddress' => Yii::$app->request->userIP,
             'userAgent' => Yii::$app->request->userAgent,
-            'referrer' => Yii::$app->request->getReferrer(),
+            'referrer'  => Yii::$app->request->getReferrer(),
         ]));
 
+        // Cache detail for a short period; rely on CDN / browser cache
+        $this->setCacheHeaders(30);
         return $this->successResponse($postData);
     }
 
@@ -189,7 +203,8 @@ class PostController extends ApiController
             }
             Yii::$app->cache->set($cacheKey, $data, 3600);
         }
-        
+
+        $this->setCacheHeaders(300);
         return $this->successResponse($data);
     }
 
@@ -210,7 +225,8 @@ class PostController extends ApiController
             }
             Yii::$app->cache->set($cacheKey, $data, 3600);
         }
-        
+
+        $this->setCacheHeaders(300);
         return $this->successResponse($data);
     }
 
@@ -225,27 +241,30 @@ class PostController extends ApiController
             return $this->successResponse([]);
         }
 
-        // Search active public posts matching the query
+        // Search active public posts — only select columns needed for suggestions
         $posts = Post::find()
+            ->select(['{{%posts}}.id', '{{%posts}}.title', '{{%posts}}.title_en', '{{%posts}}.slug'])
             ->publicActive()
-            ->andWhere(['or', 
+            ->andWhere(['or',
                 ['like', '{{%posts}}.title', $q],
                 ['like', '{{%posts}}.title_en', $q]
             ])
             ->orderBy(['published_at' => SORT_DESC])
             ->limit(8)
+            ->asArray()
             ->all();
 
-        $suggestions = [];
-        foreach ($posts as $post) {
-            $suggestions[] = [
-                'id' => $post->id,
-                'title' => $post->title,
-                'title_en' => $post->title_en,
-                'slug' => $post->slug,
+        $suggestions = array_map(function($post) {
+            return [
+                'id'       => (int)$post['id'],
+                'title'    => $post['title'],
+                'title_en' => $post['title_en'],
+                'slug'     => $post['slug'],
             ];
-        }
+        }, $posts);
 
+        // Very short cache so it stays fresh
+        $this->setCacheHeaders(10);
         return $this->successResponse($suggestions);
     }
 }

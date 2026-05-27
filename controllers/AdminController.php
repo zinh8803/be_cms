@@ -658,13 +658,17 @@ class AdminController extends ApiController
             $query->andWhere(['like', '{{%post_views}}.ip_address', trim($params['ip_address'])]);
         }
 
-        // Calculate dynamic summary metrics based on current filters
-        $totalQuery = clone $query;
-        $totalHits = (int)$totalQuery->count();
-        
-        $spamQuery = clone $query;
-        $spamHits = (int)$spamQuery->andWhere(['{{%post_views}}.is_spam' => 1])->count();
-        
+        // Aggregate metrics in a single SQL pass (avoids 2 separate COUNT queries)
+        $metricsQuery = clone $query;
+        $metricsRow = $metricsQuery
+            ->select([
+                'total'     => 'COUNT(*)',
+                'spam_hits' => 'SUM({{%post_views}}.is_spam)',
+            ])
+            ->asArray()
+            ->one();
+        $totalHits = (int)($metricsRow['total'] ?? 0);
+        $spamHits  = (int)($metricsRow['spam_hits'] ?? 0);
         $validHits = $totalHits - $spamHits;
 
         $dataProvider = new \yii\data\ActiveDataProvider([
@@ -719,12 +723,16 @@ class AdminController extends ApiController
             return $this->errorResponse(403, 'Bạn không có quyền.');
         }
 
+        // Fetch notifications and unread count in a single query using aggregate
         $notifications = \app\models\Notification::find()
             ->orderBy(['created_at' => SORT_DESC])
             ->limit(100)
             ->all();
 
-        $unreadCount = (int)\app\models\Notification::find()->where(['is_read' => 0])->count();
+        // Reuse a lightweight scalar query — no full model loading
+        $unreadCount = (int)\app\models\Notification::find()
+            ->where(['is_read' => 0])
+            ->count();
 
         $data = array_map(function($n) {
             return [

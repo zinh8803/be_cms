@@ -37,7 +37,24 @@ class PostSearch extends Model
      */
     public function searchPublic($params)
     {
+        // Select only columns needed for the public post card list
+        // Explicitly exclude nothing — but ensure content is loaded for summary generation
         $query = Post::find()
+            ->select([
+                '{{%posts}}.id',
+                '{{%posts}}.title',
+                '{{%posts}}.title_en',
+                '{{%posts}}.slug',
+                '{{%posts}}.content',     // needed for 160-char summary
+                '{{%posts}}.content_en',  // needed for bilingual summary
+                '{{%posts}}.category_id',
+                '{{%posts}}.thumbnail_id',
+                '{{%posts}}.view_count',
+                '{{%posts}}.published_at',
+                '{{%posts}}.status',
+                '{{%posts}}.visibility',
+                '{{%posts}}.deleted_at',
+            ])
             ->publicActive()
             ->with(['category', 'tags', 'thumbnail']);
 
@@ -96,7 +113,22 @@ class PostSearch extends Model
      */
     public function searchAdmin($params, $userId, $userRole)
     {
+        // Select only columns needed for the admin post list view
         $query = Post::find()
+            ->select([
+                '{{%posts}}.id',
+                '{{%posts}}.title',
+                '{{%posts}}.title_en',
+                '{{%posts}}.slug',
+                '{{%posts}}.category_id',
+                '{{%posts}}.author_id',
+                '{{%posts}}.thumbnail_id',
+                '{{%posts}}.status',
+                '{{%posts}}.visibility',
+                '{{%posts}}.view_count',
+                '{{%posts}}.created_at',
+                '{{%posts}}.deleted_at',
+            ])
             ->notDeleted()
             ->with(['category', 'tags', 'thumbnail', 'author']);
 
