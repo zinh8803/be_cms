@@ -64,6 +64,16 @@ class PostSearch extends Model
                 'pageSize' => 6,
             ],
             'sort' => [
+                'attributes' => [
+                    'published_at' => [
+                        'asc' => ['{{%posts}}.published_at' => SORT_ASC],
+                        'desc' => ['{{%posts}}.published_at' => SORT_DESC],
+                    ],
+                    'created_at' => [
+                        'asc' => ['{{%posts}}.created_at' => SORT_ASC],
+                        'desc' => ['{{%posts}}.created_at' => SORT_DESC],
+                    ],
+                ],
                 'defaultOrder' => [
                     'published_at' => SORT_DESC,
                     'created_at' => SORT_DESC,
@@ -143,6 +153,16 @@ class PostSearch extends Model
                 'pageSize' => 10,
             ],
             'sort' => [
+                'attributes' => [
+                    'created_at' => [
+                        'asc' => ['{{%posts}}.created_at' => SORT_ASC],
+                        'desc' => ['{{%posts}}.created_at' => SORT_DESC],
+                    ],
+                    'title',
+                    'status',
+                    'visibility',
+                    'view_count',
+                ],
                 'defaultOrder' => [
                     'created_at' => SORT_DESC,
                 ],
