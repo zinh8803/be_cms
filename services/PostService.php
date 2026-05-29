@@ -55,8 +55,11 @@ class PostService
             $seo = new PostSeo();
             $seo->post_id = $post->id;
             $seo->title = $form->seo_title ? $form->seo_title : $post->title;
+            $seo->title_en = $form->seo_title_en ? $form->seo_title_en : $post->title_en;
             $seo->description = $form->seo_description;
+            $seo->description_en = $form->seo_description_en;
             $seo->keywords = $form->seo_keywords;
+            $seo->keywords_en = $form->seo_keywords_en;
             if (!$seo->save()) {
                 $form->addErrors($seo->getErrors());
                 throw new \Exception('Không thể lưu thông tin SEO.');
@@ -146,8 +149,11 @@ class PostService
                 $seo->post_id = $post->id;
             }
             $seo->title = $form->seo_title ? $form->seo_title : $post->title;
+            $seo->title_en = $form->seo_title_en ? $form->seo_title_en : $post->title_en;
             $seo->description = $form->seo_description;
+            $seo->description_en = $form->seo_description_en;
             $seo->keywords = $form->seo_keywords;
+            $seo->keywords_en = $form->seo_keywords_en;
             if (!$seo->save()) {
                 $form->addErrors($seo->getErrors());
                 throw new \Exception('Không thể lưu thông tin SEO.');

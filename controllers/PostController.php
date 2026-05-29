@@ -157,14 +157,13 @@ class PostController extends ApiController
             'published_at' => $post->published_at,
             'updated_at' => $post->updated_at,
             'related' => $related,
-            'seo' => $post->postSeo ? [
-                'title' => $post->postSeo->title,
-                'description' => $post->postSeo->description,
-                'keywords' => $post->postSeo->keywords,
-            ] : [
-                'title' => $post->title,
-                'description' => mb_strimwidth(strip_tags($post->content), 0, 160, '...'),
-                'keywords' => '',
+            'seo' => [
+                'title' => ($post->postSeo && $post->postSeo->title) ? $post->postSeo->title : $post->title,
+                'title_en' => ($post->postSeo && $post->postSeo->title_en) ? $post->postSeo->title_en : $post->title_en,
+                'description' => ($post->postSeo && $post->postSeo->description) ? $post->postSeo->description : mb_strimwidth(strip_tags($post->content), 0, 160, '...'),
+                'description_en' => ($post->postSeo && $post->postSeo->description_en) ? $post->postSeo->description_en : ($post->content_en ? mb_strimwidth(strip_tags($post->content_en), 0, 160, '...') : null),
+                'keywords' => ($post->postSeo && $post->postSeo->keywords) ? $post->postSeo->keywords : '',
+                'keywords_en' => ($post->postSeo && $post->postSeo->keywords_en) ? $post->postSeo->keywords_en : '',
             ],
         ];
 

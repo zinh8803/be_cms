@@ -21,8 +21,11 @@ class PostForm extends Model
     public $visibility = Post::VISIBILITY_PUBLIC;
     public $tags = []; // array of tag strings
     public $seo_title;
+    public $seo_title_en;
     public $seo_description;
+    public $seo_description_en;
     public $seo_keywords;
+    public $seo_keywords_en;
 
     /**
      * {@inheritdoc}
@@ -32,7 +35,7 @@ class PostForm extends Model
         return [
             [['title', 'content', 'category_id'], 'required', 'message' => '{attribute} không được để trống.'],
             [['category_id', 'thumbnail_id'], 'integer'],
-            [['content', 'content_en', 'seo_title', 'seo_description', 'seo_keywords'], 'string'],
+            [['content', 'content_en', 'seo_title', 'seo_title_en', 'seo_description', 'seo_description_en', 'seo_keywords', 'seo_keywords_en'], 'string'],
             [['title_en'], 'string', 'max' => 255],
             [['status', 'visibility'], 'string', 'max' => 50],
             ['category_id', 'exist', 'targetClass' => Category::class, 'targetAttribute' => 'id', 'message' => 'Danh mục không tồn tại.'],

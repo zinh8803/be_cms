@@ -158,8 +158,11 @@ class AdminController extends ApiController
             'tags' => $tags,
             'seo' => $post->postSeo ? [
                 'title' => $post->postSeo->title,
+                'title_en' => $post->postSeo->title_en,
                 'description' => $post->postSeo->description,
+                'description_en' => $post->postSeo->description_en,
                 'keywords' => $post->postSeo->keywords,
+                'keywords_en' => $post->postSeo->keywords_en,
             ] : null,
         ];
 
